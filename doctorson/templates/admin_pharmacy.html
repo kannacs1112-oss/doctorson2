@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Pharmacy Admin - DoctorsOn{% endblock %}
+{% block content %}
+<div class="card-top" style="align-items:center; margin-top: 14px;">
+  <h1>Pharmacy Admin</h1>
+  <form method="post" action="{{ url_for('admin_logout') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button class="btn" type="submit">Log out</button>
+  </form>
+</div>
+
+<div class="admin-tabs">
+  <a class="btn" href="{{ url_for('admin') }}">Doctors, Hospitals &amp; SOS</a>
+  <a class="btn primary" href="{{ url_for('admin_pharmacy') }}">Pharmacy &amp; Delivery Orders</a>
+</div>
+
+<h2 class="section-title">Home Delivery Orders</h2>
+{% if not orders %}
+  <div class="empty">No pharmacy orders yet.</div>
+{% endif %}
+{% for o in orders %}
+  <article class="card" style="margin-bottom:10px;">
+    <div class="card-top">
+      <div>
+        <strong>{{ o.order_code }}</strong> &middot; {{ o.customer_name }} ({{ o.phone }})
+        {% if o.whatsapp %} &middot; WA: {{ o.whatsapp }}{% endif %}
+        <div class="muted" style="font-size:.86rem;">
+          {{ o.address }}{% if o.city %}, {{ o.city }}{% endif %} &middot; {{ o.created_at }} &middot; {{ o.payment_method }}
+        </div>
+        {% if o.rx_reference or o.has_rx %}
+          <div style="font-size:.84rem; color:#1d4ed8;">
+            Rx Info: {{ o.rx_reference or 'Customer submitted prescription' }}
+          </div>
+        {% endif %}
+        {% if o.rx_storage_key %}
+          <div class="rx-admin-details">
+            <a href="{{ url_for('admin_download_prescription', oid=o.id) }}">Download private prescription attachment</a>
+            <div>AI status: {{ o.rx_ai_status or 'Manual review' }} · Doctor: {{ o.rx_doctor_name or 'Not detected' }} · Date: {{ o.rx_date or 'Not detected' }}</div>
+            <div>Doctor enrolled: {{ 'Yes' if o.rx_doctor_verified else 'No / not verified' }} · Date rule passed: {{ 'Yes' if o.rx_date_valid else 'No / not verified' }}</div>
+            {% if o.rx_ai_summary %}<div>{{ o.rx_ai_summary }}</div>{% endif %}
+          </div>
+        {% endif %}
+      </div>
+      <form method="post" action="{{ url_for('admin_update_order', oid=o.id) }}" class="row">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <select name="status">
+          {% for st in ORDER_STATUSES %}
+            <option value="{{ st }}" {{ 'selected' if o.status == st }}>{{ st }}</option>
+          {% endfor %}
+        </select>
+        <button class="btn sm primary" type="submit">Update</button>
+      </form>
+    </div>
+    <ul style="margin:8px 0 4px; padding-left:18px; font-size:.9rem;">
+      {% for it in items_by_order.get(o.id, []) %}
+        <li>{{ it.medicine_name }} ({{ it.pack_size }}) &times; {{ it.quantity }} = {{ it.line_total|money }}</li>
+      {% endfor %}
+    </ul>
+    <div style="font-size:.9rem;">
+      <strong>Total: {{ o.total|money }}</strong>
+      (Subtotal {{ o.subtotal|money }}{% if o.discount_amount %} − offer {{ o.discount_amount|money }}{% endif %} + Delivery {{ o.delivery_fee|money }})
+    </div>
+  </article>
+{% endfor %}
+
+<div class="grid" style="margin-top:20px;">
+  <form class="card stack" method="post" action="{{ url_for('admin_add_medicine') }}">
+    <h3>Add medicine</h3>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input name="name" placeholder="Medicine name (e.g. Paracetamol 500mg)" required>
+    <input name="generic_name" placeholder="Generic / composition">
+    <input name="category" placeholder="Category (e.g. Pain &amp; Fever)" value="General">
+    <input name="pack_size" placeholder="Pack size (e.g. Strip of 10 tablets)">
+    <div class="row">
+      <input type="number" step="0.01" min="0" name="price" placeholder="Price" required>
+      <input type="number" min="0" name="stock" placeholder="Stock qty" required>
+    </div>
+    <label class="check"><input type="checkbox" name="requires_rx" value="1"> Prescription required</label>
+    <textarea name="description" rows="2" placeholder="Description"></textarea>
+    <button class="btn primary" type="submit">Add medicine</button>
+  </form>
+</div>
+
+<h2 class="section-title">Medicine Inventory</h2>
+<div class="card table-wrap">
+  <table class="hours">
+    <tr><th>Medicine</th><th>Category</th><th>Price</th><th>Stock</th><th>Flags</th><th>Action</th></tr>
+    {% for m in medicines %}
+      <tr>
+        <td>
+          <strong>{{ m.name }}</strong>
+          <div class="muted" style="font-size:.82rem;">{{ m.generic_name }} &middot; {{ m.pack_size }}</div>
+        </td>
+        <td>{{ m.category }}</td>
+        <td colspan="3">
+          <form method="post" action="{{ url_for('admin_edit_medicine', mid=m.id) }}" class="row" style="flex-wrap:wrap;">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="number" step="0.01" min="0" name="price" value="{{ '%.2f'|format(m.price) }}" style="width:90px;">
+            <input type="number" min="0" name="stock" value="{{ m.stock }}" style="width:80px;">
+            <label class="check"><input type="checkbox" name="requires_rx" value="1" {{ 'checked' if m.requires_rx }}> Rx</label>
+            <label class="check"><input type="checkbox" name="is_active" value="1" {{ 'checked' if m.is_active }}> Active</label>
+            <button class="btn sm primary" type="submit">Save</button>
+          </form>
+        </td>
+        <td>
+          <form method="post" action="{{ url_for('admin_delete_medicine', mid=m.id) }}"
+                data-confirm="Delete {{ m.name }} from pharmacy catalog?">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <button class="btn danger sm" type="submit">Delete</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

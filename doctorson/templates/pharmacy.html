@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% block title %}Pharmacy &amp; Home Delivery - DoctorsOn{% endblock %}
+{% block content %}
+<div class="card-top" style="align-items:center; flex-wrap:wrap; margin-top: 14px;">
+  <section class="hero" style="padding: 8px 0;">
+    <h1>DoctorsOn <em>Pharmacy</em> &amp; Home Delivery</h1>
+    <p>Order genuine medicines online and get doorstep delivery. Free delivery on orders {{ PHARMACY_FREE_DELIVERY_OVER|money }}+.</p>
+  </section>
+  <a class="btn" href="{{ url_for('pharmacy_track') }}">Track my order</a>
+</div>
+
+<form class="filters" method="get" action="{{ url_for('pharmacy') }}" data-auto-submit="1">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search medicine name, generic salt or symptom">
+  <select name="category">
+    <option value="">All categories</option>
+    {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if filters.category == c }}>{{ c }}</option>
+    {% endfor %}
+  </select>
+  <label class="check"><input type="checkbox" name="in_stock" value="1" {{ 'checked' if filters.in_stock }}> In stock only</label>
+  <label class="check"><input type="checkbox" name="otc" value="1" {{ 'checked' if filters.otc }}> No prescription needed</label>
+  <button class="btn primary" type="submit">Search</button>
+  {% if filters.q or filters.category or filters.in_stock or filters.otc %}
+    <a class="btn" href="{{ url_for('pharmacy') }}">Reset</a>
+  {% endif %}
+</form>
+
+<div class="pharmacy-layout">
+  <div>
+    <p class="count">{{ medicines|length }} medicine{{ '' if medicines|length == 1 else 's' }} available</p>
+    {% if not medicines %}
+      <div class="empty">No medicines match your search.</div>
+    {% endif %}
+    <div class="grid">
+      {% for m in medicines %}
+        <article class="card">
+          <div class="card-top">
+            <div>
+              <h2>{{ m.name }}</h2>
+              {% if m.generic_name %}<div class="degree">{{ m.generic_name }}</div>{% endif %}
+            </div>
+            <span class="badge cat">{{ m.category }}</span>
+          </div>
+
+          <div class="actions" style="margin: 8px 0 4px;">
+            {% if m.requires_rx %}
+              <span class="badge rx">Prescription Required</span>
+            {% endif %}
+            {% if m.stock > 10 %}
+              <span class="stock-ok">In stock</span>
+            {% elif m.stock > 0 %}
+              <span class="stock-low">Low stock ({{ m.stock }} left)</span>
+            {% else %}
+              <span class="stock-out">Out of stock</span>
+            {% endif %}
+          </div>
+
+          {% if m.pack_size %}<div class="muted" style="font-size:.86rem;">Pack: {{ m.pack_size }}</div>{% endif %}
+          {% if m.description %}<p class="detail">{{ m.description }}</p>{% endif %}
+
+          <div class="card-top" style="align-items:center; margin-top: 10px;">
+            <span class="price">{{ m.price|money }}</span>
+            {% if m.stock > 0 %}
+              <form method="post" action="{{ url_for('pharmacy_cart_add') }}" class="row" style="gap:6px;">
+                <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+                <input type="hidden" name="medicine_id" value="{{ m.id }}">
+                <input class="qty-input" type="number" name="quantity" value="1" min="1" max="{{ m.stock }}" aria-label="Quantity">
+                <button class="btn primary" type="submit">Add</button>
+              </form>
+            {% else %}
+              <button class="btn" disabled>Unavailable</button>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  </div>
+
+  <aside class="card cart-panel">
+    <div class="card-top" style="align-items:center; margin-bottom: 10px;">
+      <h3>Your Delivery Cart ({{ cart.item_count }})</h3>
+      {% if cart["items"] %}
+        <form method="post" action="{{ url_for('pharmacy_cart_clear') }}">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="link-btn" type="submit">Clear</button>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if not cart["items"] %}
+      <p class="muted">Your cart is empty. Add medicines from the catalog to schedule home delivery.</p>
+    {% else %}
+      {% for item in cart["items"] %}
+        <div class="cart-item">
+          <div class="card-top">
+            <div>
+              <strong>{{ item.name }}</strong>
+              {% if item.requires_rx %}<span class="badge rx">Rx</span>{% endif %}
+              <div class="muted" style="font-size:.8rem;">{{ item.unit_price|money }} &times; {{ item.quantity }}</div>
+            </div>
+            <strong>{{ item.line_total|money }}</strong>
+          </div>
+          <form method="post" action="{{ url_for('pharmacy_cart_update') }}" class="row" style="margin-top:6px;">
+            <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+            <input type="hidden" name="medicine_id" value="{{ item.id }}">
+            <input class="qty-input" type="number" name="quantity" value="{{ item.quantity }}" min="0" max="{{ item.stock }}">
+            <button class="btn sm" type="submit">Update</button>
+          </form>
+        </div>
+      {% endfor %}
+
+      <div class="cart-summary" id="pharmacy-cart-summary"
+           data-subtotal="{{ '%.2f'|format(cart.subtotal) }}"
+           data-delivery-fee="{{ '%.2f'|format(cart.delivery_fee) }}"
+           data-currency="{{ CURRENCY }}">
+        <div class="row-between"><span>Subtotal</span><span>{{ cart.subtotal|money }}</span></div>
+        <div class="row-between rx-discount-preview" id="rx-discount-preview" hidden>
+          <span>Verified prescription offer</span><strong id="rx-discount-amount"></strong>
+        </div>
+        <div class="row-between">
+          <span>Home Delivery</span>
+          <span>{% if cart.delivery_fee == 0 %}<strong>FREE</strong>{% else %}{{ cart.delivery_fee|money }}{% endif %}</span>
+        </div>
+        <div class="row-between total-row"><span>Total</span><span id="cart-total-value">{{ cart.total|money }}</span></div>
+      </div>
+
+      <form id="pharmacy-checkout-form" method="post" action="{{ url_for('pharmacy_checkout') }}"
+            data-rx-analyze-url="{{ url_for('pharmacy_prescription_analyze') }}"
+            enctype="multipart/form-data" class="stack" style="margin-top:12px;">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <h4 style="margin:4px 0 0;">Home Delivery Details</h4>
+        <input name="customer_name" placeholder="Full name *" required>
+        <input name="phone" placeholder="Mobile number *" required>
+        <input name="whatsapp" placeholder="WhatsApp number (for delivery &amp; Rx)">
+        <input name="city" placeholder="City / Area">
+        <textarea name="address" rows="2" placeholder="Full house / street / landmark address *" required></textarea>
+        <select name="payment_method">
+          {% for pm in PAYMENT_METHODS %}
+            <option value="{{ pm }}">{{ pm }}</option>
+          {% endfor %}
+        </select>
+
+        {% if cart.requires_rx %}
+          <section class="rx-panel" aria-labelledby="rx-heading">
+            <div class="card-top" style="align-items:center;">
+              <div>
+                <span class="hb-label">AI Pharmacy Assistant</span>
+                <h4 id="rx-heading" style="margin:2px 0 0;">Prescription photo / file analysis</h4>
+              </div>
+              <span class="badge rx">Up to {{ PHARMACY_RX_DISCOUNT_PERCENT|round|int }}% offer</span>
+            </div>
+            <p class="muted" style="font-size:.86rem; margin:8px 0;">
+              Take a photo with your phone camera or attach a PDF/image. The AI extracts the doctor's name,
+              prescription date and medicine text. It does not prescribe or approve dispensing.
+            </p>
+            <input type="hidden" id="rx-upload-token" name="rx_upload_token" value="">
+            <label for="rx-prescription-file">Prescription photo or file</label>
+            <input id="rx-prescription-file" type="file" name="prescription_file"
+                   accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp"
+                   capture="environment">
+            {% if AI_PRESCRIPTION_ENABLED %}
+              <label class="check" style="padding:0; font-size:.82rem; margin-top:4px;">
+                <input type="checkbox" id="rx-ai-consent" name="rx_ai_consent" value="1">
+                I consent to sending this prescription to the configured OpenAI API for text extraction. Provider retention policies may apply.
+              </label>
+            {% else %}
+              <p class="muted" style="font-size:.78rem; margin:5px 0;">
+                AI is not configured on this server yet. You can still attach the prescription for manual pharmacist review.
+              </p>
+            {% endif %}
+            <button class="btn" id="rx-analyze-button" type="button">Upload &amp; analyse prescription</button>
+            <div id="rx-analysis-result" class="rx-analysis-result" role="status" aria-live="polite" hidden></div>
+            <label class="check" style="padding:0; font-size:.85rem; margin-top:8px;">
+              <input type="checkbox" name="has_rx" value="1"> I have a valid prescription (or will provide it to the pharmacist)
+            </label>
+            <input name="rx_reference" placeholder="Doctor / prescription reference (optional)" style="margin-top:6px; width:100%;">
+            <p class="muted" style="font-size:.76rem; margin:6px 0 0;">
+              The prescription offer (up to {{ PHARMACY_RX_DISCOUNT_PERCENT|round|int }}%) is applied only when the AI can read the date and the doctor exactly matches a
+              doctor enrolled for pharmacy offers in DoctorsOn. The prescription must be dated today or yesterday
+              in {{ TIME_ZONE_LABEL }}. The pharmacist must verify the original before dispensing.
+            </p>
+          </section>
+        {% endif %}
+
+        <input name="notes" placeholder="Delivery instructions (optional)">
+        <button class="btn primary" type="submit">Place Home Delivery Order</button>
+      </form>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

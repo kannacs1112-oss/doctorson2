@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Track Medicine Order - DoctorsOn Pharmacy{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pharmacy') }}">&larr; Back to Pharmacy</a></p>
+
+<section class="profile">
+  <h1>Track your medicine delivery</h1>
+  <p class="muted">Enter your Order Code (e.g. DO-A1B2C3) or phone number.</p>
+  <form method="get" action="{{ url_for('pharmacy_track') }}" class="filters">
+    <input name="code" value="{{ code }}" placeholder="Order Code (e.g. DO-1A2B3C)">
+    <input name="phone" value="{{ phone }}" placeholder="Or Mobile Number">
+    <button class="btn primary" type="submit">Track Order</button>
+  </form>
+</section>
+
+{% if searched %}
+  {% if not orders %}
+    <div class="empty">No matching pharmacy orders found.</div>
+  {% else %}
+    <div class="grid" style="margin-top: 14px;">
+      {% for o in orders %}
+        <article class="card">
+          <div class="card-top">
+            <div>
+              <h2><a href="{{ url_for('pharmacy_order', order_code=o.order_code) }}">{{ o.order_code }}</a></h2>
+              <div class="muted">{{ o.created_at }}</div>
+            </div>
+            <span class="badge {{ 'off' if o.status == 'Cancelled' else ('available' if o.status == 'Delivered' else 'upcoming') }}">{{ o.status }}</span>
+          </div>
+          <p class="detail">{{ o.customer_name }} &middot; {{ o.address }}<br>Total: <strong>{{ o.total|money }}</strong></p>
+          <a class="btn" href="{{ url_for('pharmacy_order', order_code=o.order_code) }}">View details</a>
+        </article>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}
+{% endblock %}

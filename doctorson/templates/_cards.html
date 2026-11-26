@@ -1,0 +1,81 @@
+<p class="count">{{ doctors|length }} doctor{{ '' if doctors|length == 1 else 's' }} found</p>
+{% if not doctors %}
+  <div class="empty">No doctors match your search. Try clearing a filter.</div>
+{% endif %}
+<div class="grid">
+{% for d in doctors %}
+  <article class="card">
+    <div class="card-top">
+      <div>
+        <h2><a href="{{ url_for('doctor_page', doctor_id=d.id) }}">{{ d.name }}</a></h2>
+        {% if d.degree %}<div class="degree">{{ d.degree }}</div>{% endif %}
+        <div class="spec">
+          {{ d.speciality }}
+          {% if d.is_emergency %}<span class="badge er">SOS Emergency</span>{% endif %}
+        </div>
+      </div>
+      <span class="badge {{ d.status }}">{{ d.status_label }}</span>
+    </div>
+
+    {% if d.status == 'available' and d.current_hospital %}
+      <div class="hospital-banner current">
+        <span class="hb-label">Working right now at</span>
+        <div class="hb-name">{{ d.current_hospital.name }}</div>
+        <div class="hb-meta">
+          {% if d.current_hospital.address %}{{ d.current_hospital.address }}{% endif %}
+          {% if d.current_hospital.city %} &middot; {{ d.current_hospital.city }}{% endif %}
+          &middot; until {{ d.current_hospital.end_time|time12 }}
+        </div>
+      </div>
+    {% elif d.status == 'upcoming' and d.next_hospital %}
+      <div class="hospital-banner upcoming">
+        <span class="hb-label">Starts later today at</span>
+        <div class="hb-name">{{ d.next_hospital.name }}</div>
+        <div class="hb-meta">
+          at {{ d.next_hospital.start_time|time12 }}
+          {% if d.next_hospital.city %} &middot; {{ d.next_hospital.city }}{% endif %}
+        </div>
+      </div>
+    {% elif d.hospitals %}
+      <div class="hospital-chips">
+        <span class="muted">Hospitals:</span>
+        {% for h in d.hospitals %}
+          <a class="hospital-chip" href="{{ url_for('index', hospital=h.id) }}">{{ h.name }}</a>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if d.status_detail and d.status == 'off' %}
+      <p class="detail">{{ d.status_detail }}</p>
+    {% endif %}
+
+    <div class="today">
+      <strong>Today</strong>
+      {% if d.today %}
+        <ul>
+        {% for s in d.today %}
+          <li class="{{ 'now' if s.is_current }}">
+            <span class="hosp-tag">{{ s.hospital_name }}</span> &middot; {{ s.start_time|time12 }} - {{ s.end_time|time12 }}
+          </li>
+        {% endfor %}
+        </ul>
+      {% else %}
+        <span class="muted"> Not scheduled</span>
+      {% endif %}
+    </div>
+
+    {% if d.whatsapp %}
+      <div class="contact-line">WhatsApp: <strong>{{ d.whatsapp }}</strong></div>
+    {% endif %}
+
+    <div class="actions">
+      {% if d.phone %}<a class="btn primary" href="tel:{{ d.phone|tel }}">Call</a>{% endif %}
+      {% if d.whatsapp %}
+        <a class="btn whatsapp" href="https://wa.me/{{ d.whatsapp|wa }}" target="_blank" rel="noopener">WhatsApp</a>
+      {% endif %}
+      {% if d.email %}<a class="btn" href="mailto:{{ d.email }}">Email</a>{% endif %}
+      <a class="btn" href="{{ url_for('doctor_page', doctor_id=d.id) }}">Full schedule</a>
+    </div>
+  </article>
+{% endfor %}
+</div>

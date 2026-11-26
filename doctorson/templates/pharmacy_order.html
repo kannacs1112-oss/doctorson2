@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Order {{ order.order_code }} - DoctorsOn Pharmacy{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pharmacy') }}">&larr; Back to Pharmacy</a></p>
+
+<section class="profile">
+  <div class="card-top">
+    <div>
+      <h1>Order {{ order.order_code }}</h1>
+      <div class="muted">Placed on {{ order.created_at }} · {{ TIME_ZONE_LABEL }} · {{ order.payment_method }}</div>
+    </div>
+    <span class="badge {{ 'off' if order.status == 'Cancelled' else ('available' if order.status == 'Delivered' else 'upcoming') }}">
+      {{ order.status }}
+    </span>
+  </div>
+
+  {% if order.status == 'Cancelled' %}
+    <div class="steps">
+      <div class="step cancelled">Order Cancelled</div>
+    </div>
+  {% else %}
+    {% set idx = ORDER_STATUSES.index(order.status) if order.status in ORDER_STATUSES else 0 %}
+    <div class="steps">
+      {% for st in ['Pending', 'Confirmed', 'Out for Delivery', 'Delivered'] %}
+        <div class="step {{ 'done' if loop.index0 <= idx }}">{{ st }}</div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="hospital-banner neutral">
+    <span class="hb-label">Delivering To</span>
+    <div class="hb-name">{{ order.customer_name }} &middot; {{ order.phone }}</div>
+    <div class="hb-meta">
+      {{ order.address }}{% if order.city %}, {{ order.city }}{% endif %}
+      {% if order.notes %}<br>Note: {{ order.notes }}{% endif %}
+    </div>
+  </div>
+
+  {% if order.has_rx and order.rx_storage_key %}
+    <p class="muted" style="font-size:.86rem;">Prescription file received. A pharmacist must verify it before prescription medicines are dispensed.</p>
+  {% elif order.has_rx %}
+    <div class="actions" style="margin-bottom: 10px;">
+      <a class="btn whatsapp"
+         href="https://wa.me/{{ PHARMACY_WHATSAPP|wa }}?text={{ ('Prescription for Pharmacy Order ' ~ order.order_code)|urlencode }}"
+         target="_blank" rel="noopener">
+        Send Prescription Photo on WhatsApp ({{ PHARMACY_WHATSAPP }})
+      </a>
+    </div>
+  {% endif %}
+
+  <table class="hours">
+    <tr><th>Medicine</th><th>Pack</th><th>Qty</th><th>Amount</th></tr>
+    {% for it in items %}
+      <tr>
+        <td>{{ it.medicine_name }}</td>
+        <td>{{ it.pack_size }}</td>
+        <td>{{ it.quantity }} &times; {{ it.unit_price|money }}</td>
+        <td><strong>{{ it.line_total|money }}</strong></td>
+      </tr>
+    {% endfor %}
+    <tr><td colspan="3">Subtotal</td><td>{{ order.subtotal|money }}</td></tr>
+    {% if order.discount_amount > 0 %}
+      <tr><td colspan="3">Verified prescription offer ({{ order.discount_percent|round|int }}%)</td><td>-{{ order.discount_amount|money }}</td></tr>
+    {% endif %}
+    <tr>
+      <td colspan="3">Home Delivery Fee</td>
+      <td>{% if order.delivery_fee == 0 %}FREE{% else %}{{ order.delivery_fee|money }}{% endif %}</td>
+    </tr>
+    <tr class="today-row"><td colspan="3">Total Payable</td><td>{{ order.total|money }}</td></tr>
+  </table>
+</section>
+{% endblock %}

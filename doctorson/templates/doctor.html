@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ d.name }} - DoctorsOn{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('index') }}">&larr; All doctors</a></p>
+
+<section class="profile" data-doctor-id="{{ d.id }}">
+  <div class="card-top">
+    <div>
+      <h1>{{ d.name }}</h1>
+      {% if d.degree %}<div class="degree">{{ d.degree }}</div>{% endif %}
+      <div class="spec">
+        {{ d.speciality }}
+        {% if d.is_emergency %}<span class="badge er">SOS Emergency</span>{% endif %}
+      </div>
+    </div>
+    <span id="status-badge" class="badge {{ d.status }}">{{ d.status_label }}</span>
+  </div>
+
+  {% if d.current_hospital %}
+    <div class="hospital-banner current">
+      <span class="hb-label">Currently on duty at</span>
+      <div class="hb-name">{{ d.current_hospital.name }}</div>
+      <div class="hb-meta">
+        {{ d.current_hospital.address }}{% if d.current_hospital.city %}, {{ d.current_hospital.city }}{% endif %}
+        &middot; until {{ d.current_hospital.end_time|time12 }}
+      </div>
+    </div>
+  {% elif d.next_hospital and d.status == 'upcoming' %}
+    <div class="hospital-banner upcoming">
+      <span class="hb-label">Next shift today at</span>
+      <div class="hb-name">{{ d.next_hospital.name }}</div>
+      <div class="hb-meta">at {{ d.next_hospital.start_time|time12 }}</div>
+    </div>
+  {% endif %}
+
+  <p id="status-detail" class="detail">{{ d.status_detail }}</p>
+  {% if d.bio %}<p>{{ d.bio }}</p>{% endif %}
+  {% if d.emergency_note %}<div class="er-note">Emergency Role: {{ d.emergency_note }}</div>{% endif %}
+
+  <div class="actions">
+    {% if d.phone %}<a class="btn primary" href="tel:{{ d.phone|tel }}">Call {{ d.phone }}</a>{% endif %}
+    {% if d.whatsapp %}
+      <a class="btn whatsapp" href="https://wa.me/{{ d.whatsapp|wa }}" target="_blank" rel="noopener">
+        WhatsApp {{ d.whatsapp }}
+      </a>
+    {% endif %}
+    {% if d.email %}<a class="btn" href="mailto:{{ d.email }}">{{ d.email }}</a>{% endif %}
+  </div>
+</section>
+
+<h2 class="section-title">Where and when {{ d.name }} works</h2>
+{% if not d.hospitals %}
+  <div class="empty">No schedule has been added yet.</div>
+{% endif %}
+<div class="grid">
+{% for h in d.hospitals %}
+  <article class="card {{ 'hospital-active' if h.is_current }}">
+    <div class="card-top">
+      <h3>{{ h.name }}</h3>
+      {% if h.is_current %}<span class="badge available">Working here now</span>{% endif %}
+    </div>
+    <p class="muted">{{ h.address }}{% if h.city %}, {{ h.city }}{% endif %}</p>
+    <div class="actions" style="margin: 8px 0 12px;">
+      {% if h.phone %}<a class="btn sm" href="tel:{{ h.phone|tel }}">Hospital Desk: {{ h.phone }}</a>{% endif %}
+      {% if h.emergency_phone %}<a class="btn sos sm" href="tel:{{ h.emergency_phone|tel }}">ER Desk: {{ h.emergency_phone }}</a>{% endif %}
+    </div>
+    <table class="hours">
+      {% for day in h.days %}
+        <tr class="{{ 'today-row' if day.is_today }}">
+          <td>{{ day.weekday }}{% if day.is_today %} <small>(today)</small>{% endif %}</td>
+          <td>{{ day.hours }}</td>
+        </tr>
+      {% endfor %}
+    </table>
+  </article>
+{% endfor %}
+</div>
+<p class="muted">Times shown in {{ tz }}.</p>
+{% endblock %}

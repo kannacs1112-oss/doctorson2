@@ -1,0 +1,70 @@
+<p class="count">{{ doctors|length }} emergency specialist{{ '' if doctors|length == 1 else 's' }} listed</p>
+{% if not doctors %}
+  <div class="empty">
+    No emergency doctors match this filter. Clear filters or check "Include all doctors" above.
+  </div>
+{% endif %}
+<div class="grid">
+{% for d in doctors %}
+  <article class="card sos-card {{ 'is-live' if d.status == 'available' }}">
+    <div class="card-top">
+      <div>
+        <h2><a href="{{ url_for('doctor_page', doctor_id=d.id) }}">{{ d.name }}</a></h2>
+        {% if d.degree %}<div class="degree">{{ d.degree }}</div>{% endif %}
+        <div class="spec">{{ d.speciality }}</div>
+      </div>
+      {% if d.status == 'available' %}
+        <span class="badge available">IN HOSPITAL NOW</span>
+      {% elif d.status == 'upcoming' %}
+        <span class="badge upcoming">LATER TODAY</span>
+      {% else %}
+        <span class="badge er">ON-CALL STANDBY</span>
+      {% endif %}
+    </div>
+
+    {% if d.emergency_note %}
+      <div class="er-note">{{ d.emergency_note }}</div>
+    {% endif %}
+
+    {% set target_hosp = d.current_hospital or d.next_hospital or d.primary_hospital %}
+    {% if target_hosp %}
+      <div class="hospital-banner {{ 'current' if d.current_hospital else 'neutral' }}">
+        <span class="hb-label">
+          {{ 'Doctor currently inside' if d.current_hospital else 'Primary / Next Hospital' }}
+        </span>
+        <div class="hb-name">{{ target_hosp.name }}</div>
+        <div class="hb-meta">
+          {{ target_hosp.address }}{% if target_hosp.city %}, {{ target_hosp.city }}{% endif %}
+          {% if d.current_hospital %}
+            &middot; until {{ d.current_hospital.end_time|time12 }}
+          {% elif d.status_detail %}
+            &middot; {{ d.status_detail }}
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="contact-line">
+      {% if d.phone %}Doctor: <strong>{{ d.phone }}</strong>{% endif %}
+      {% if d.whatsapp %} &middot; WhatsApp: <strong>{{ d.whatsapp }}</strong>{% endif %}
+    </div>
+
+    <div class="actions">
+      {% if d.phone %}
+        <a class="btn sos" href="tel:{{ d.phone|tel }}">Call Doctor</a>
+      {% endif %}
+      {% if d.whatsapp %}
+        <a class="btn whatsapp" href="https://wa.me/{{ d.whatsapp|wa }}" target="_blank" rel="noopener">WhatsApp</a>
+      {% endif %}
+      {% if target_hosp and target_hosp.emergency_phone %}
+        <a class="btn danger" href="tel:{{ target_hosp.emergency_phone|tel }}">Call ER Desk</a>
+      {% elif target_hosp and target_hosp.phone %}
+        <a class="btn" href="tel:{{ target_hosp.phone|tel }}">Hospital Desk</a>
+      {% endif %}
+      {% if target_hosp %}
+        <a class="btn" href="https://www.google.com/maps/search/?api=1&query={{ (target_hosp.name ~ ' ' ~ target_hosp.address ~ ' ' ~ target_hosp.city)|urlencode }}" target="_blank" rel="noopener">Route</a>
+      {% endif %}
+    </div>
+  </article>
+{% endfor %}
+</div>

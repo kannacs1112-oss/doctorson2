@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Admin login - DoctorsOn{% endblock %}
+{% block content %}
+<section class="profile narrow">
+  <h1>Admin login</h1>
+  <form method="post" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="password" name="password" placeholder="Password" autofocus required>
+    <button class="btn primary" type="submit">Log in</button>
+  </form>
+</section>
+{% endblock %}

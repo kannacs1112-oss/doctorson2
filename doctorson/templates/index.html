@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="hero">
+  <h1>Find a doctor who's working <em>right now</em></h1>
+  <p>Live working hours, highlighted current hospital, doctor qualifications, call &amp; WhatsApp.</p>
+</section>
+
+<form class="filters" method="get" action="{{ url_for('index') }}" data-auto-submit="1">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="Search doctor, degree, speciality or hospital">
+  <select name="speciality">
+    <option value="">All specialities</option>
+    {% for s in specialities %}
+      <option value="{{ s }}" {{ 'selected' if filters.speciality == s }}>{{ s }}</option>
+    {% endfor %}
+  </select>
+  <select name="hospital">
+    <option value="">All hospitals</option>
+    {% for h in hospitals %}
+      <option value="{{ h.id }}" {{ 'selected' if filters.hospital == h.id }}>{{ h.name }}</option>
+    {% endfor %}
+  </select>
+  <label class="check"><input type="checkbox" name="available" value="1" {{ 'checked' if filters.available }}> Available now</label>
+  <button class="btn primary" type="submit">Search</button>
+  {% if filters.q or filters.speciality or filters.hospital or filters.available %}
+    <a class="btn" href="{{ url_for('index') }}">Reset</a>
+  {% endif %}
+</form>
+
+<div class="live-bar">
+  <span class="dot"></span>
+  <span id="live-stamp" data-tz="{{ tz }}">Live &middot; {{ now.strftime('%a %d %b, %I:%M %p') }} ({{ tz }})</span>
+</div>
+
+<div id="results" data-live-url="{{ url_for('partial_doctors') }}" data-live-interval="30000">
+  {% include "_cards.html" %}
+</div>
+{% endblock %}

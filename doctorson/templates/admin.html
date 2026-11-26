@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Admin - DoctorsOn{% endblock %}
+{% block content %}
+<div class="card-top" style="align-items:center; margin-top: 14px;">
+  <h1>Admin</h1>
+  <form method="post" action="{{ url_for('admin_logout') }}">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <button class="btn" type="submit">Log out</button>
+  </form>
+</div>
+
+<div class="admin-tabs">
+  <a class="btn primary" href="{{ url_for('admin') }}">Doctors, Hospitals &amp; SOS</a>
+  <a class="btn" href="{{ url_for('admin_pharmacy') }}">
+    Pharmacy &amp; Delivery Orders{% if pending_orders %} ({{ pending_orders }} active){% endif %}
+  </a>
+</div>
+
+{% if default_pw %}
+  <div class="flash error">You are using the default admin password. Set DOCTORSON_ADMIN_PASSWORD before going live.</div>
+{% endif %}
+
+<div class="grid">
+  <form class="card stack" method="post" action="{{ url_for('add_hospital') }}">
+    <h3>Add hospital</h3>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input name="name" placeholder="Hospital name" required>
+    <input name="city" placeholder="City">
+    <input name="address" placeholder="Address">
+    <input name="phone" placeholder="Main Desk Phone">
+    <input name="emergency_phone" placeholder="Emergency / ER Desk Phone">
+    <label class="check"><input type="checkbox" name="has_er" value="1" checked> Has 24/7 ER / Ambulance Reception</label>
+    <button class="btn primary">Add hospital</button>
+  </form>
+
+  <form class="card stack" method="post" action="{{ url_for('add_doctor') }}">
+    <h3>Add doctor</h3>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input name="name" placeholder="Full name (e.g. Dr. Jane Doe)" required>
+    <input name="degree" placeholder="Degree (e.g. MBBS, MD)">
+    <input name="speciality" placeholder="Speciality" required>
+    <input name="phone" placeholder="Phone">
+    <input name="whatsapp" placeholder="WhatsApp number (e.g. +91 98765 43210)">
+    <input name="email" type="email" placeholder="Email">
+    <textarea name="bio" rows="2" placeholder="Short bio"></textarea>
+    <label class="check"><input type="checkbox" name="is_emergency" value="1"> SOS Emergency / Ambulance Roster</label>
+    <label class="check"><input type="checkbox" name="pharmacy_discount_eligible" value="1"> Verified DoctorsOn enrolment — eligible for prescription offer checks</label>
+    <input name="emergency_note" placeholder="Emergency note (e.g. Trauma &amp; Cardiac ER)">
+    <button class="btn primary">Add doctor</button>
+  </form>
+
+  <form class="card stack" method="post" action="{{ url_for('add_schedule') }}">
+    <h3>Add working hours</h3>
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <select name="doctor_id" required>
+      <option value="">Doctor...</option>
+      {% for d in doctors %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}
+    </select>
+    <select name="hospital_id" required>
+      <option value="">Hospital...</option>
+      {% for h in hospitals %}<option value="{{ h.id }}">{{ h.name }}</option>{% endfor %}
+    </select>
+    <div class="days">
+      {% for name in WEEKDAYS %}
+        <label class="check"><input type="checkbox" name="weekday" value="{{ loop.index0 }}"> {{ name[:3] }}</label>
+      {% endfor %}
+    </div>
+    <div class="row">
+      <input type="time" name="start_time" required>
+      <input type="time" name="end_time" required>
+    </div>
+    <label class="check"><input type="checkbox" name="overnight" value="1"> Overnight shift (ends next morning)</label>
+    <button class="btn primary">Add hours</button>
+  </form>
+</div>
+
+<h2 class="section-title">Doctors &amp; schedules</h2>
+{% for d in doctors %}
+  <article class="card" style="margin-bottom:10px;">
+    <div class="card-top">
+      <div>
+        <strong>{{ d.name }}</strong>
+        {% if d.degree %}<span class="muted">({{ d.degree }})</span>{% endif %}
+        <span class="spec">{{ d.speciality }}</span>
+        {% if d.is_emergency %}<span class="badge er">SOS</span>{% endif %}
+        {% if d.pharmacy_discount_eligible %}<span class="badge available">Rx offer enrolled</span>{% endif %}
+        <div class="muted" style="font-size:.85rem;">
+          {% if d.phone %}Tel: {{ d.phone }}{% endif %}
+          {% if d.whatsapp %} &middot; WhatsApp: {{ d.whatsapp }}{% endif %}
+        </div>
+      </div>
+      <div class="row">
+        <a class="btn sm" href="{{ url_for('edit_doctor', did=d.id) }}">Edit</a>
+        <form method="post" action="{{ url_for('delete_doctor', did=d.id) }}"
+              data-confirm="Delete {{ d.name }} and all their hours?">
+          <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+          <button class="btn danger sm">Delete</button>
+        </form>
+      </div>
+    </div>
+    <table class="hours">
+      {% for s in slots_by_doc.get(d.id, []) %}
+        <tr>
+          <td>{{ WEEKDAYS[s.weekday] }}</td>
+          <td>{{ s.start_time|time12 }} - {{ s.end_time|time12 }}</td>
+          <td>{{ s.hospital_name }}</td>
+          <td>
+            <form method="post" action="{{ url_for('delete_schedule', sid=s.id) }}">
+              <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+              <button class="link-btn">remove</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td class="muted">No hours yet</td></tr>
+      {% endfor %}
+    </table>
+  </article>
+{% endfor %}
+
+<h2 class="section-title">Hospitals</h2>
+{% for h in hospitals %}
+  <article class="card card-top" style="margin-bottom:10px;">
+    <div>
+      <strong>{{ h.name }}</strong>
+      <div class="muted" style="font-size:.86rem;">
+        {{ h.address }} {{ h.city }} &middot; Desk: {{ h.phone or '—' }}
+        {% if h.emergency_phone %} &middot; ER: {{ h.emergency_phone }}{% endif %}
+      </div>
+    </div>
+    <div class="row">
+      <a class="btn sm" href="{{ url_for('edit_hospital', hid=h.id) }}">Edit</a>
+      <form method="post" action="{{ url_for('delete_hospital', hid=h.id) }}"
+            data-confirm="Delete {{ h.name }} and every schedule slot at it?">
+        <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+        <button class="btn danger sm">Delete</button>
+      </form>
+    </div>
+  </article>
+{% endfor %}
+{% endblock %}

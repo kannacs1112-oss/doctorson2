@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block title %}Edit {{ h.name }} - Admin{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin') }}">&larr; Back to Admin</a></p>
+
+<section class="profile" style="max-width: 560px;">
+  <h1>Edit Hospital</h1>
+  <form method="post" class="stack">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <label>Hospital Name *<input name="name" value="{{ h.name }}" required></label>
+    <label>City<input name="city" value="{{ h.city }}"></label>
+    <label>Address<input name="address" value="{{ h.address }}"></label>
+    <label>Main Desk Phone<input name="phone" value="{{ h.phone }}"></label>
+    <label>Emergency / ER Desk Phone<input name="emergency_phone" value="{{ h.emergency_phone }}"></label>
+    <label class="check">
+      <input type="checkbox" name="has_er" value="1" {{ 'checked' if h.has_er }}>
+      Has 24/7 ER / Ambulance Reception
+    </label>
+    <button class="btn primary" type="submit">Save changes</button>
+  </form>
+</section>
+{% endblock %}
